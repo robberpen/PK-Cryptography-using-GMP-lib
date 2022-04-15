@@ -6,21 +6,29 @@
 #include <unistd.h>
 #include <string.h>
 #include <gmp.h>
+#include <time.h>
 
 gmp_randstate_t state;
 
-int main(){
+int main(int argc, char *argv[]){
 	char buffer[50], tmpCharArray[2], message[50]={'0'};
 	int ascii[50];
 	long sd;
 	int j=0, flag;
+	int ksize = 256, round = 10000;
 	//e = encryption key, d = decryption key, p,p2 = prime Zp = generator, k random where 1 <= k <= p-2, F = phi function, gamma and delta compose the ciphertext we send c=(gamma,delta)
 	mpz_t seed, plainText, cipherText, p, p2, Zp, e, d, D, k, F, tmp, tmp2, gamma, delta;
 	
 	
+	if (argc > 1)
+		ksize = atoi(argv[1]);
+	if (argc > 2)
+		round = atoi(argv[2]);
 	//Read message to encrypt
 	printf("Give message to encrypt: \n");
-	fgets(message ,50, stdin);
+	//fgets(message ,50, stdin);
+	//memset(message, 'a', sizeof(message) - 1);
+	sprintf(message, "1234567890");
 	
 	gmp_randinit(state, GMP_RAND_ALG_LC, 120);
 	
@@ -48,9 +56,9 @@ int main(){
 	gmp_randseed(state, seed);
 	
 	//Generate two random 200-bit numbers
-	mpz_urandomb(p, state, 200);
+	mpz_urandomb(p, state, ksize);
 	printf("p = "); mpz_out_str(stdout, 10, p); printf("\n");
-	
+	printf("p is %d bits\n", mpz_sizeinbase(p, 2));
 	//Looking for a prime number p where t = p - 1 = 2 * p2
 	do{
 		mpz_nextprime(p2,p);
@@ -59,6 +67,7 @@ int main(){
 	}while( !mpz_probab_prime_p(p,10) );
 		
 	printf("p = "); mpz_out_str(stdout, 10, p); printf("\n");
+	printf("p is %d bits\n", mpz_sizeinbase(p, 2));
 	
 	mpz_sub_ui(F, p, 1);	//F = p -1
 	printf("F = "); mpz_out_str(stdout, 10, F); printf("\n");
@@ -112,22 +121,27 @@ int main(){
 	mpz_set_str(plainText, buffer, 10);
 	printf("Plaintext: "); mpz_out_str(stdout, 10, plainText); printf("\n");
 	
-	//Encrypt
-	//Calculate gamma
-	mpz_powm(gamma, Zp, k, p);	//gamma = Zp ^ k modulo p
-	printf("Gamma = "); mpz_out_str(stdout, 10, gamma); printf("\n");
-	//Calculate delta
-	mpz_powm(delta, gamma, d, p);	//delta = gamma^d modulo p
-	mpz_mul(delta, delta, plainText);	//delta = delta * plainText
-	mpz_mod(delta, delta, p);	//delta = delta modulo p
-	printf("Delta = "); mpz_out_str(stdout, 10, delta); printf("\n");
-	
-	//Decrypt
-	//Calculate F - d
-	mpz_sub(tmp, F, d);	//tmp = F - d
-	//Calculate gamma ^ (-d) modulo p
-	mpz_powm(tmp2, gamma, tmp, p);	//tmp2 = gamma ^ tmp modulo p
-	
+	clock_t t0 = clock();
+	for (int i = 0; i < round; i++) { // PTM
+		//Encrypt
+		//Calculate gamma
+		mpz_powm(gamma, Zp, k, p);	//gamma = Zp ^ k modulo p
+		//printf("Gamma = "); mpz_out_str(stdout, 10, gamma); printf("\n");
+		//Calculate delta
+		mpz_powm(delta, gamma, d, p);	//delta = gamma^d modulo p
+		mpz_mul(delta, delta, plainText);	//delta = delta * plainText
+		mpz_mod(delta, delta, p);	//delta = delta modulo p
+		//printf("Delta = "); mpz_out_str(stdout, 10, delta); printf("\n");
+		
+		//Decrypt
+		//Calculate F - d
+		mpz_sub(tmp, F, d);	//tmp = F - d
+		//Calculate gamma ^ (-d) modulo p
+		mpz_powm(tmp2, gamma, tmp, p);	//tmp2 = gamma ^ tmp modulo p
+		
+	}
+	clock_t t1 = clock();
+	printf("KPI %lu ms\n", (t1 - t0)/1000);
 	//Recraft the plaintext
 	mpz_mul(plainText, tmp2, delta);
 	mpz_mod(plainText, plainText, p);

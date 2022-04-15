@@ -6,21 +6,30 @@
 #include <unistd.h>
 #include <string.h>
 #include <gmp.h>
+#include <time.h>
 
 gmp_randstate_t state;
 
-int main(){
+int main(int argc, char *argv[]){
 	char buffer[50], buffer2[50], message[50]={'0'}, tmpCharArray[2]={'0'};	
 	int j=0;
 	int ascii[50];
 	long sd = 0;
+	int ksize = 256, round = 10000;
 	//e = encryption key, d = decryption key
 	mpz_t p, q, N, e, d, p1, q1, F, plainText, cipherText, fBound, myGCD ;
 	mpz_t seed;
 	
+	if (argc > 1)
+		ksize = atoi(argv[1]);
+	if (argc > 2)
+		round = atoi(argv[2]);
+
+	printf("key size: %d round: %d\n", ksize, round);
 	//Read message to encrypt
 	printf("Give message to encrypt: \n");
-	fgets(message ,50, stdin);
+	//fgets(message ,50, stdin);
+	sprintf(message, "1234567890");
 
 
 	gmp_randinit(state, GMP_RAND_ALG_LC, 120);
@@ -48,11 +57,11 @@ int main(){
 
 	//Generate two random 512-bit numbers 
 	do{	
-		mpz_urandomb(p, state, 512);
+		mpz_urandomb(p, state, ksize);
 	}while( !mpz_probab_prime_p(p, 10) );
 	
 	do{	
-		mpz_urandomb(q, state, 512);
+		mpz_urandomb(q, state, ksize);
 	}while( !mpz_probab_prime_p(q, 10) );
 	//Print p and q
 	printf("p = "); mpz_out_str(stdout, 10, p); printf("\n");
@@ -92,15 +101,20 @@ int main(){
 
 	mpz_set_str(plainText, buffer, 10);
 	printf("Plaintext: "); mpz_out_str(stdout, 10, plainText); printf("\n");
+	clock_t t0 = clock();
 
+	for (int i = 0; i < round; i++) {	// PTM
 	//Encrypt
 	mpz_powm(cipherText, plainText, e, N);
-	printf("Ciphertext = "); mpz_out_str(stdout, 10, cipherText); printf("\n");
+	//printf("Ciphertext = "); mpz_out_str(stdout, 10, cipherText); printf("\n");
 
 	//Decrypt
 	mpz_powm(plainText, cipherText, d, N);
-	printf("Plaintext = "); mpz_out_str(stdout, 10, plainText); printf("\n");
+	//printf("Plaintext = "); mpz_out_str(stdout, 10, plainText); printf("\n");
+	}
+	clock_t t1 = clock();
 
+	printf("KPI %lu ms\n", (t1 - t0)/1000);
 	//Plaintext in ASCII
 	mpz_get_str(buffer, 10, plainText);
 	j=0;
@@ -118,7 +132,7 @@ int main(){
 	}while(!ascii[j]);
 	
 	
-	printf("Initial message = ");
+	printf("PTM Initial message = ");
 	puts(message);
 
 	mpz_clear(p);
